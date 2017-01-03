@@ -16,6 +16,8 @@
 
 package org.alljoyn.cops.filetransfer;
 
+import android.os.Environment;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -93,8 +95,8 @@ public class ReceiveManager implements ReceiveManagerListener
 		
 		completedListenerLock = new Object();
 		savePathLock = new Object();
-		
-		setDefaultSaveDirectory("/mnt/sdcard/download");
+
+		setDefaultSaveDirectory(Environment.getExternalStorageDirectory().getAbsolutePath()+"/download");
 	}
 	
 	/*------------------------------------------------------------------------*
@@ -354,12 +356,15 @@ public class ReceiveManager implements ReceiveManagerListener
 	public void handleFileChunk(byte[] fileID, int startByte, int chunkLength, byte[] chunk)
 	{		
 		FileStatus status = getFileStatus(fileID);
-		
+		if (status == null) {
+			return;
+		}
+
 		if (startByte < status.numBytesSent)
 		{
 			Logger.log("out of order file chunk received");			
-		}		
-		else if (status != null)
+		}
+		else
 		{			
 			try
 			{

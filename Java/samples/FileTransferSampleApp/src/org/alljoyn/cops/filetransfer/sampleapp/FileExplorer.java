@@ -89,6 +89,9 @@ public class FileExplorer extends Activity
 	private void listDir() 
 	{
 		File[] files = selected.listFiles();
+		if (files == null) {
+			files = new File[]{};
+		}
 
 		fileList.clear();
 		for (File file : files) 

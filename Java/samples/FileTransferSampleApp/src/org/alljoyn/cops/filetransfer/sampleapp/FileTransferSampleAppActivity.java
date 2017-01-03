@@ -27,13 +27,17 @@ import org.alljoyn.cops.filetransfer.listener.OfferReceivedListener;
 import org.alljoyn.cops.filetransfer.listener.RequestDataReceivedListener;
 import org.alljoyn.cops.filetransfer.listener.UnannouncedFileRequestListener;
 import org.alljoyn.cops.filetransfer.sampleapp.AlljoynManager.ConnectionState;
+
+import android.Manifest;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.support.v4.app.ActivityCompat;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.Button;
@@ -42,7 +46,13 @@ import android.widget.ProgressBar;
 import android.widget.Toast;
 
 public class FileTransferSampleAppActivity extends Activity implements ConnectionListener
-{	
+{
+	/* Storage Permissions */
+	private static final int REQUEST_EXTERNAL_STORAGE = 1;
+	private static String[] PERMISSIONS_STORAGE = {
+			Manifest.permission.READ_EXTERNAL_STORAGE,
+			Manifest.permission.WRITE_EXTERNAL_STORAGE };
+
 	/* UI Handler Codes */
 	private static final int TOAST = 0;
 	private static final int ENABLE_VIEW = 1;
@@ -116,7 +126,9 @@ public class FileTransferSampleAppActivity extends Activity implements Connectio
         ajManager = new AlljoynManager();  
         ajManager.setConnectionListener(this);
         
-        initializeGuiModules();  
+        initializeGuiModules();
+
+		verifyStoragePermissions(this);
     }
     
     /* Initialize and assign listeners to UI Modules */
@@ -320,6 +332,19 @@ public class FileTransferSampleAppActivity extends Activity implements Connectio
                     initializeFileTransferModule();     
                 }
             }.start();                      
+		}
+		else if (connectionState == ConnectionState.DISCONNECTED)
+		{
+			handler.sendMessage(handler.obtainMessage(TOAST, "Disconnected!"));
+
+			handler.sendMessage(handler.obtainMessage(ENABLE_VIEW, hostButton));
+			handler.sendMessage(handler.obtainMessage(ENABLE_VIEW, joinButton));
+
+			handler.sendMessage(handler.obtainMessage(DISABLE_VIEW, shareButton));
+			handler.sendMessage(handler.obtainMessage(DISABLE_VIEW, unshareButton));
+			handler.sendMessage(handler.obtainMessage(DISABLE_VIEW, requestButton));
+			handler.sendMessage(handler.obtainMessage(DISABLE_VIEW, offerButton));
+			handler.sendMessage(handler.obtainMessage(DISABLE_VIEW, requestByPathButton));
 		}
 	}
     
@@ -689,5 +714,29 @@ public class FileTransferSampleAppActivity extends Activity implements Connectio
 	    }
     	ajManager.disconnect();  	
     	super.onBackPressed();
-    }	
+    }
+
+	/**
+	 * Checks if the app has permission to write to device storage.
+	 * If the app does not has permission then the user will be prompted to grant permissions.
+	 *
+	 * Note: From API 23+(6.0) you need to request the read/write permissions even if they are
+	 *       already in your manifest known as Requesting Permissions at Run Time.
+	 *
+	 * @param activity
+	 */
+	public static void verifyStoragePermissions(Activity activity) {
+		// Check if we have write permission
+		int permission = ActivityCompat.checkSelfPermission(activity, Manifest.permission.WRITE_EXTERNAL_STORAGE);
+
+		if (permission != PackageManager.PERMISSION_GRANTED) {
+			// We don't have permission so prompt the user
+			ActivityCompat.requestPermissions(
+					activity,
+					PERMISSIONS_STORAGE,
+					REQUEST_EXTERNAL_STORAGE
+			);
+		}
+	}
+
 }

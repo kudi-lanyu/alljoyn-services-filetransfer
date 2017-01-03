@@ -101,8 +101,14 @@ public class AlljoynManager
 			public void sessionJoined(short sessionPort, int id, String joiner) 
 		    {		    	
 		    	sessionId = id;
-		    	
 		    	peers.add(joiner);
+
+				bus.setSessionListener( id, new SessionListener() {
+					@Override
+					public void sessionLost(int sessionId, int reason) {
+						handleSessionLost();
+					}
+				});
 		    	
 		    	connectionState = ConnectionState.CONNECTED;
 		    	if (connectionListener != null)
@@ -153,7 +159,7 @@ public class AlljoynManager
 	 * Called when the session host has been found and finalizes joining 
 	 * the session
 	 */
-	private void doJoinSession(final String name)
+	private synchronized void doJoinSession(final String name)
 	{
 		SessionOpts sessionOpts = new SessionOpts();
 		Mutable.IntegerValue mutableSessionId = new Mutable.IntegerValue();
@@ -163,19 +169,43 @@ public class AlljoynManager
 			@Override
 			public void sessionMemberAdded(int sessionId, String busId)
 			{
-				peers.add(busId);
+				if (!peers.contains(busId)) {
+					peers.add(busId);
+				}
 			}
-		});     	  
+			@Override
+			public void sessionLost(int sessionId, int reason) {
+				handleSessionLost();
+			}
+		});
+
 		Logger.log("join returned: " + status.toString());
 
-		sessionId = mutableSessionId.value;
-		Logger.log("sessionId = " + sessionId);
-		
-		connectionState = ConnectionState.CONNECTED;
-		if (connectionListener != null)
-    	{
-    		connectionListener.ConnectionChanged(connectionState);
-    	}
+		if (status == Status.OK) {
+			sessionId = mutableSessionId.value;
+			Logger.log("sessionId = " + sessionId);
+
+			connectionState = ConnectionState.CONNECTED;
+			if (connectionListener != null) {
+				connectionListener.ConnectionChanged(connectionState);
+			}
+		}
+	}
+
+	/**
+	 * Called when AllJoyn session lost notification is received. In separate thread reset the bus
+	 * and notify connection listener of disconnect.
+	 */
+	private void handleSessionLost() {
+		new Thread()
+		{
+			public void run()
+			{
+				disconnect();
+				bus = new BusAttachment("FileTransfer", BusAttachment.RemoteMessage.Receive);
+				connectionListener.ConnectionChanged(connectionState);
+			}
+		}.start();
 	}
 	
 	/*
@@ -203,6 +233,7 @@ public class AlljoynManager
 		{
 			bus.leaveSession(sessionId);
 			bus.disconnect();
+			bus.release();
 			connectionState = ConnectionState.DISCONNECTED;
 		}
 	}
